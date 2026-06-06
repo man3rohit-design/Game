@@ -1,0 +1,78 @@
+#include "Game.h"
+#include <algorithm>
+#include <cctype>
+
+Game::Game(const WordEntry& wordEntry, const GameConfig& config)
+    : entry(wordEntry), config(config), score(0), wrongCount(0),
+      hintUsed(false), status(GameStatus::PLAYING) {
+}
+
+bool Game::guessLetter(char letter) {
+    letter = static_cast<char>(std::toupper(static_cast<unsigned char>(letter)));
+
+    if (guessedLetters.count(letter)) return false; // already guessed
+    guessedLetters.insert(letter);
+
+    const std::string& word = entry.word;
+    bool found = (word.find(letter) != std::string::npos);
+
+    if (found) {
+        score += 10;
+    } else {
+        wrongLetters.insert(letter);
+        wrongCount++;
+        score -= 5;
+        if (score < 0) score = 0;
+    }
+
+    updateStatus();
+    return found;
+}
+
+bool Game::useHint() {
+    if (hintUsed) return false;
+    hintUsed = true;
+    score = (score >= 20) ? score - 20 : 0;
+    return true;
+}
+
+void Game::updateStatus() {
+    const std::string& word = entry.word;
+
+    // Check win: every letter guessed
+    bool allGuessed = true;
+    for (char c : word) {
+        if (!guessedLetters.count(c)) { allGuessed = false; break; }
+    }
+    if (allGuessed) {
+        score += 50;
+        status = GameStatus::WIN;
+        return;
+    }
+
+    if (wrongCount >= config.maxAttempts) {
+        status = GameStatus::LOSE;
+    }
+}
+
+GameStatus Game::getStatus()           const { return status; }
+int        Game::getRemainingAttempts() const { return config.maxAttempts - wrongCount; }
+int        Game::getMaxAttempts()       const { return config.maxAttempts; }
+int        Game::getScore()             const { return score; }
+bool       Game::isHintUsed()           const { return hintUsed; }
+int        Game::getWrongCount()        const { return wrongCount; }
+std::string Game::getWord()             const { return entry.word; }
+std::string Game::getHint()             const { return entry.hint; }
+std::string Game::getCategory()         const { return entry.category; }
+std::set<char> Game::getGuessedLetters() const { return guessedLetters; }
+std::set<char> Game::getWrongLetters()   const { return wrongLetters; }
+
+std::string Game::getMaskedWord() const {
+    std::string masked;
+    for (char c : entry.word) {
+        masked += guessedLetters.count(c) ? c : '_';
+        masked += ' ';
+    }
+    if (!masked.empty()) masked.pop_back();
+    return masked;
+}
